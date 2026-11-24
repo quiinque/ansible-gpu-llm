@@ -28,19 +28,15 @@
       dest: /etc/apt/keyrings/nvidia-container-toolkit.asc
 
 - name: Configure signed repositories
-  ansible.builtin.apt_repository:
-    repo: '{{ item.repo }}'
-    filename: '{{ item.filename }}'
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: deb
+    uris: https://download.docker.com/linux/ubuntu
+    suites: "{{ ansible_distribution_release }}"
+    components: stable
+    architectures: amd64
+    signed_by: /etc/apt/keyrings/docker.asc
     state: present
-  loop:
-    - filename: docker
-      repo: >-
-        deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
-        https://download.docker.com/linux/ubuntu {{ ansible_facts.distribution_release }} stable
-    - filename: nvidia-container-toolkit
-      repo: >-
-        deb [signed-by=/etc/apt/keyrings/nvidia-container-toolkit.asc]
-        https://nvidia.github.io/libnvidia-container/stable/deb/amd64 /
 
 - name: Install Docker and NVIDIA Container Toolkit
   ansible.builtin.apt:

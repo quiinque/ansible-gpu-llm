@@ -23,7 +23,11 @@
 - name: Verify GPU inside container
   ansible.builtin.command:
     argv: [docker, compose, -p, gpu_llm, -f, '{{ gpu_llm_directory }}/compose.yml', exec, -T, ollama, nvidia-smi]
+  register: gpu_llm_nvidia_smi
   changed_when: false
+  failed_when: >-
+    gpu_llm_nvidia_smi.rc | default(1) != 0 or
+    'NVIDIA-SMI' not in (gpu_llm_nvidia_smi.stdout | default(''))
 
 - name: Wait for API and list downloaded models
   ansible.builtin.uri:
@@ -52,6 +56,12 @@
   when: >-
     gpu_llm_refresh_model or
     gpu_llm_model not in (gpu_llm_available_models.json.models | map(attribute='name') | list)
+  register: gpu_llm_pull
   async: '{{ gpu_llm_pull_timeout | int }}'
   poll: 15
-  changed_when: true
+  changed_when: >-
+    gpu_llm_pull.stdout is defined and
+    ('pulling' in gpu_llm_pull.stdout or 'success' in gpu_llm_pull.stdout)
+  failed_when: >-
+    gpu_llm_pull.finished | default(false) != true or
+    gpu_llm_pull.rc | default(1) != 0

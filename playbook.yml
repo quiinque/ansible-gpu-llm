@@ -2,7 +2,6 @@
 - name: Configure NVIDIA GPU inference hosts
   hosts: gpu_servers
   become: true
-  serial: 1
   any_errors_fatal: true
   environment:
     DOCKER_HOST: unix:///var/run/docker.sock
