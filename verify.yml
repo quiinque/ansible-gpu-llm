@@ -1,0 +1,7 @@
+---
+- name: Verify deployed Ollama without changing infrastructure
+  hosts: gpu_servers
+  gather_facts: false
+  tasks:
+    - name: Run inference checks
+      ansible.builtin.include_tasks: tasks/verify.yml

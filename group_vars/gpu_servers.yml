@@ -1,0 +1,17 @@
+---
+wsl_test_mode: false
+# For production replace the mutable tag with a tested tag or image@sha256:digest.
+ollama_image: ollama/ollama:latest
+ollama_model: qwen2.5:3b
+ollama_port: 11434
+ollama_directory: /opt/ollama
+ollama_context_length: 4096
+ollama_keep_alive: 10m
+model_pull_timeout: 7200
+generation_timeout: 600
+# Existing working drivers are preserved. Otherwise Ubuntu selects a GPGPU driver.
+# Optionally specify a package supported by your GPU, e.g. nvidia-driver-XXX-server.
+nvidia_driver_package: ''
+allow_reboot: true
+require_gpu_inference: true
+refresh_model: false

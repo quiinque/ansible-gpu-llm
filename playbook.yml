@@ -1,0 +1,178 @@
+---
+- name: Configure NVIDIA GPU server and Ollama API
+  hosts: gpu_servers
+  become: true
+  serial: 1
+  environment:
+    DOCKER_HOST: unix:///var/run/docker.sock
+  tasks:
+    - name: Detect WSL kernel
+      ansible.builtin.set_fact:
+        running_in_wsl: "{{ 'microsoft' in (ansible_facts.kernel | lower) }}"
+
+    - name: Validate supported platform and configuration
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Ubuntu'
+          - ansible_facts.distribution_version in ['22.04', '24.04']
+          - ansible_facts.architecture == 'x86_64'
+          - (wsl_test_mode | bool) == (running_in_wsl | bool)
+          - ansible_facts.service_mgr == 'systemd'
+          - ollama_port | int > 1024
+          - ollama_port | int < 65536
+          - "':' in ollama_model"
+          - ollama_directory is match('^/[a-zA-Z0-9/_-]+$')
+        fail_msg: Require Ubuntu 22.04/24.04 amd64 with systemd and explicit model tag. For WSL use inventory.wsl.ini; WSL mode is forbidden on a native server.
+
+    - name: Verify WSL GPU bridge
+      ansible.builtin.stat:
+        path: /dev/dxg
+      register: wsl_gpu_bridge
+      when: wsl_test_mode | bool
+
+    - name: Require GPU-enabled WSL2
+      ansible.builtin.assert:
+        that: wsl_gpu_bridge.stat.exists
+        fail_msg: WSL GPU bridge missing. Check WSL2 and the Windows NVIDIA driver.
+      when: wsl_test_mode | bool
+
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - pciutils
+          - python3-apt
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Configure native Linux GPU driver
+      ansible.builtin.include_tasks: tasks/driver.yml
+      when: not (wsl_test_mode | bool)
+
+    - name: Verify host GPU driver
+      ansible.builtin.command:
+        argv:
+          - "{{ '/usr/lib/wsl/lib/nvidia-smi' if wsl_test_mode | bool else 'nvidia-smi' }}"
+      changed_when: false
+
+    - name: Inspect installed packages for conflicting Docker installations
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Require clean Docker CE installation path
+      ansible.builtin.assert:
+        that:
+          - "item not in ansible_facts.packages"
+        fail_msg: 'Conflicting package {{ item }} found. Plan migration before running this playbook.'
+      loop: [docker.io, docker-compose, docker-compose-v2, podman-docker, containerd, runc]
+
+    - name: Create APT key directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download repository signing keys
+      ansible.builtin.get_url:
+        url: '{{ item.url }}'
+        dest: '{{ item.dest }}'
+        mode: '0644'
+      loop:
+        - url: https://download.docker.com/linux/ubuntu/gpg
+          dest: /etc/apt/keyrings/docker.asc
+        - url: https://nvidia.github.io/libnvidia-container/gpgkey
+          dest: /etc/apt/keyrings/nvidia-container-toolkit.asc
+
+    - name: Configure signed repositories
+      ansible.builtin.apt_repository:
+        repo: '{{ item.repo }}'
+        filename: '{{ item.filename }}'
+        state: present
+      loop:
+        - filename: docker
+          repo: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_facts.distribution_release }} stable'
+        - filename: nvidia-container-toolkit
+          repo: 'deb [signed-by=/etc/apt/keyrings/nvidia-container-toolkit.asc] https://nvidia.github.io/libnvidia-container/stable/deb/amd64 /'
+
+    - name: Install Docker and NVIDIA Container Toolkit
+      ansible.builtin.apt:
+        name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin, nvidia-container-toolkit]
+        state: present
+        update_cache: true
+      register: container_packages
+
+    - name: Enable Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Inspect Docker runtimes
+      ansible.builtin.command:
+        argv: [docker, info, --format, '{{ "{{json .Runtimes}}" }}']
+      register: docker_runtimes
+      changed_when: false
+
+    - name: Configure NVIDIA runtime without replacing other daemon settings
+      ansible.builtin.command: nvidia-ctk runtime configure --runtime=docker
+      when: "'nvidia' not in (docker_runtimes.stdout | from_json) or container_packages is changed"
+      changed_when: true
+      notify: Restart Docker
+
+    - name: Apply runtime before creating GPU container
+      ansible.builtin.meta: flush_handlers
+
+    - name: Create deployment directory
+      ansible.builtin.file:
+        path: '{{ ollama_directory }}'
+        state: directory
+        mode: '0755'
+
+    - name: Write Compose configuration
+      ansible.builtin.template:
+        src: compose.yml.j2
+        dest: '{{ ollama_directory }}/compose.yml'
+        mode: '0644'
+
+    - name: Start Ollama service
+      community.docker.docker_compose_v2:
+        project_src: '{{ ollama_directory }}'
+        project_name: gpu_llm
+        state: present
+        pull: missing
+        wait: true
+        wait_timeout: 180
+
+    - name: Verify GPU inside container
+      ansible.builtin.command:
+        argv: [docker, compose, -p, gpu_llm, -f, '{{ ollama_directory }}/compose.yml', exec, -T, ollama, nvidia-smi]
+      changed_when: false
+
+    - name: Wait for API and list downloaded models
+      ansible.builtin.uri:
+        url: 'http://127.0.0.1:{{ ollama_port }}/api/tags'
+        use_proxy: false
+      register: available_models
+      until: available_models.status | default(0) == 200
+      retries: 30
+      delay: 5
+
+    - name: Download model if missing or explicitly refreshed
+      ansible.builtin.command:
+        argv: [docker, compose, -p, gpu_llm, -f, '{{ ollama_directory }}/compose.yml', exec, -T, ollama, ollama, pull, '{{ ollama_model }}']
+      when: refresh_model | bool or ollama_model not in (available_models.json.models | map(attribute='name') | list)
+      async: '{{ model_pull_timeout | int }}'
+      poll: 15
+      changed_when: true
+
+    - name: Verify API generation and GPU inference
+      ansible.builtin.include_tasks: tasks/verify.yml
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        state: restarted
+
