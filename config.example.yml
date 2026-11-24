@@ -1,0 +1,7 @@
+---
+# Copy to config.local.yml (gitignored). Replace with the tested image digest.
+# Obtain on the working host: sudo docker image inspect ollama/ollama:latest
+gpu_llm_image: 'ollama/ollama@sha256:REPLACE_WITH_TESTED_DIGEST'
+# Native Ubuntu only: choose the package for your GPU/OS, do not copy blindly.
+gpu_llm_driver_package: ''
+gpu_llm_allow_reboot: false

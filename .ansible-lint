@@ -1,0 +1,6 @@
+---
+profile: shared
+strict: true
+exclude_paths:
+  - .venv/
+  - .git/

@@ -1,0 +1,39 @@
+---
+- name: Validate rendered Compose without GPU or image download
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../roles/gpu_llm/defaults/main.yml
+  vars:
+    # Syntax fixture only; never pulled or deployed.
+    gpu_llm_image: ollama/ollama:0.0.0
+  tasks:
+    - name: Create temporary render directory
+      ansible.builtin.tempfile:
+        state: directory
+      register: compose_test_directory
+
+    - name: Render and validate Compose specification
+      block:
+        - name: Render role template
+          ansible.builtin.template:
+            src: ../roles/gpu_llm/templates/compose.yml.j2
+            dest: '{{ compose_test_directory.path }}/compose.yml'
+            mode: '0600'
+
+        - name: Validate with Docker Compose parser
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - -f
+              - '{{ compose_test_directory.path }}/compose.yml'
+              - config
+              - --quiet
+          changed_when: false
+      always:
+        - name: Remove temporary render directory
+          ansible.builtin.file:
+            path: '{{ compose_test_directory.path }}'
+            state: absent

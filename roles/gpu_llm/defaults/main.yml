@@ -1,0 +1,24 @@
+---
+# Operator must select a tested image digest or explicit version tag.
+gpu_llm_image: ''
+gpu_llm_model: qwen3.6:27b
+gpu_llm_port: 11434
+gpu_llm_directory: /opt/ollama
+gpu_llm_context_length: 2048
+gpu_llm_keep_alive: 10m
+gpu_llm_pull_timeout: 14400
+gpu_llm_generation_timeout: 1800
+gpu_llm_wsl_mode: false
+gpu_llm_driver_package: ''
+gpu_llm_allow_reboot: false
+gpu_llm_require_gpu: true
+gpu_llm_refresh_model: false
+gpu_llm_apt_cache_valid_time: 3600
+# Exact package versions can be supplied as name=version for a tested OS image.
+gpu_llm_container_packages_to_install:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+  - nvidia-container-toolkit

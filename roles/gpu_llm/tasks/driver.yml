@@ -1,0 +1,49 @@
+---
+- name: Inspect PCI hardware
+  ansible.builtin.command: lspci -Dn
+  changed_when: false
+  register: gpu_llm_pci_devices
+  when: not ansible_check_mode
+
+- name: Require NVIDIA GPU
+  ansible.builtin.assert:
+    that: "gpu_llm_pci_devices.stdout is search('(?im) (0300|0302|0380): 10de:')"
+  when: not ansible_check_mode
+
+- name: Install kernel headers
+  ansible.builtin.apt:
+    name: 'linux-headers-{{ ansible_facts.kernel }}'
+    state: present
+
+- name: Install explicitly selected NVIDIA driver
+  ansible.builtin.apt:
+    name: '{{ gpu_llm_driver_package }}'
+    state: present
+  register: gpu_llm_driver_result
+
+- name: Inspect pending reboot
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: gpu_llm_reboot_marker
+
+- name: Handle required reboot
+  when:
+    - not ansible_check_mode
+    - gpu_llm_driver_result is changed or gpu_llm_reboot_marker.stat.exists
+  block:
+    - name: Require explicit maintenance permission
+      ansible.builtin.assert:
+        that: gpu_llm_allow_reboot
+        fail_msg: >-
+          Packages installed, reboot required. Reboot manually and rerun,
+          or set gpu_llm_allow_reboot=true during a maintenance window.
+
+    - name: Reboot native server
+      ansible.builtin.reboot:
+        reboot_timeout: 900
+        post_reboot_delay: 20
+
+- name: Verify native GPU driver
+  ansible.builtin.command: nvidia-smi
+  changed_when: false
+  when: not ansible_check_mode

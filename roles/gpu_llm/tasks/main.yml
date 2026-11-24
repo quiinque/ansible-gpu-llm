@@ -1,0 +1,23 @@
+---
+- name: Validate platform and configuration
+  ansible.builtin.import_tasks: preflight.yml
+  tags: [always]
+
+- name: Configure native NVIDIA driver
+  ansible.builtin.import_tasks: driver.yml
+  when: not gpu_llm_wsl_mode
+  tags: [driver]
+
+- name: Configure container engine
+  ansible.builtin.import_tasks: docker.yml
+  tags: [docker]
+
+- name: Deploy inference service
+  ansible.builtin.import_tasks: deploy.yml
+  when: not ansible_check_mode
+  tags: [deploy]
+
+- name: Verify inference service
+  ansible.builtin.import_tasks: verify.yml
+  when: not ansible_check_mode
+  tags: [verify]

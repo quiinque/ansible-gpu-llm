@@ -1,0 +1,33 @@
+---
+argument_specs:
+  main:
+    short_description: Configure an Ubuntu NVIDIA inference host
+    options:
+      gpu_llm_image:
+        type: str
+        required: true
+        description: Tested ollama/ollama version tag or SHA256 image digest.
+      gpu_llm_model:
+        type: str
+        description: Ollama model with explicit tag.
+      gpu_llm_wsl_mode:
+        type: bool
+        description: Use Windows driver in WSL2 and skip native driver installation.
+      gpu_llm_allow_reboot:
+        type: bool
+        description: Allow a required native server reboot during maintenance.
+      gpu_llm_driver_package:
+        type: str
+        description: NVIDIA driver package selected for the target hardware.
+      gpu_llm_require_gpu:
+        type: bool
+        description: Require positive VRAM allocation after inference.
+      gpu_llm_refresh_model:
+        type: bool
+        description: Explicitly refresh existing model weights.
+      gpu_llm_port:
+        type: int
+        description: Loopback TCP port for the API.
+      gpu_llm_context_length:
+        type: int
+        description: Maximum default context length.

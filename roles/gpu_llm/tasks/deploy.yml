@@ -1,0 +1,57 @@
+---
+- name: Create deployment directory
+  ansible.builtin.file:
+    path: '{{ gpu_llm_directory }}'
+    state: directory
+    mode: '0755'
+
+- name: Write Compose configuration
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: '{{ gpu_llm_directory }}/compose.yml'
+    mode: '0644'
+
+- name: Start Ollama service
+  community.docker.docker_compose_v2:
+    project_src: '{{ gpu_llm_directory }}'
+    project_name: gpu_llm
+    state: present
+    pull: missing
+    wait: true
+    wait_timeout: 180
+
+- name: Verify GPU inside container
+  ansible.builtin.command:
+    argv: [docker, compose, -p, gpu_llm, -f, '{{ gpu_llm_directory }}/compose.yml', exec, -T, ollama, nvidia-smi]
+  changed_when: false
+
+- name: Wait for API and list downloaded models
+  ansible.builtin.uri:
+    url: 'http://127.0.0.1:{{ gpu_llm_port }}/api/tags'
+    use_proxy: false
+  register: gpu_llm_available_models
+  until: gpu_llm_available_models.status | default(0) == 200
+  retries: 30
+  delay: 5
+
+- name: Download model if missing or explicitly refreshed
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -p
+      - gpu_llm
+      - -f
+      - '{{ gpu_llm_directory }}/compose.yml'
+      - exec
+      - -T
+      - ollama
+      - ollama
+      - pull
+      - '{{ gpu_llm_model }}'
+  when: >-
+    gpu_llm_refresh_model or
+    gpu_llm_model not in (gpu_llm_available_models.json.models | map(attribute='name') | list)
+  async: '{{ gpu_llm_pull_timeout | int }}'
+  poll: 15
+  changed_when: true

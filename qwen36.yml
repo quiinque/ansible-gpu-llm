@@ -1,5 +1,5 @@
-ollama_model: qwen3.6:27b
-ollama_context_length: 2048
-generation_timeout: 1800
-model_pull_timeout: 14400
-require_gpu_inference: true
+---
+gpu_llm_model: qwen3.6:27b
+gpu_llm_context_length: 2048
+gpu_llm_generation_timeout: 1800
+gpu_llm_pull_timeout: 14400

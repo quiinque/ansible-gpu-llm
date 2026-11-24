@@ -1,40 +1,41 @@
 ---
 - name: Generate a short completion
   ansible.builtin.uri:
-    url: 'http://127.0.0.1:{{ ollama_port }}/api/generate'
+    url: 'http://127.0.0.1:{{ gpu_llm_port }}/api/generate'
     method: POST
     use_proxy: false
     body_format: json
     body:
-      model: '{{ ollama_model }}'
+      model: '{{ gpu_llm_model }}'
       prompt: 'Reply with one short greeting.'
       stream: false
       think: false
       keep_alive: 10m
       options:
+        num_ctx: '{{ gpu_llm_context_length | int }}'
         num_predict: 32
         temperature: 0
-    timeout: '{{ generation_timeout | int }}'
-  register: generation
+    timeout: '{{ gpu_llm_generation_timeout | int }}'
+  register: gpu_llm_generation
 
 - name: Require a completed nonempty response
   ansible.builtin.assert:
     that:
-      - generation.json.done | bool
-      - generation.json.response | trim | length > 0
-      - generation.json.eval_count | int > 0
+      - gpu_llm_generation.json.done | bool
+      - gpu_llm_generation.json.response | trim | length > 0
+      - gpu_llm_generation.json.eval_count | int > 0
 
 - name: Inspect loaded model GPU allocation
   ansible.builtin.uri:
-    url: 'http://127.0.0.1:{{ ollama_port }}/api/ps'
+    url: 'http://127.0.0.1:{{ gpu_llm_port }}/api/ps'
     use_proxy: false
-  register: loaded_models
+  register: gpu_llm_loaded_models
 
 - name: Require GPU memory allocation for the requested model
   ansible.builtin.assert:
     that:
       - >-
-        loaded_models.json.models | selectattr('name', 'equalto', ollama_model)
+        gpu_llm_loaded_models.json.models | selectattr('name', 'equalto', gpu_llm_model)
         | map(attribute='size_vram') | map('int') | sum > 0
     fail_msg: Model did not allocate VRAM. Check driver, GPU compatibility, memory and Ollama logs.
-  when: require_gpu_inference | bool
+  when: gpu_llm_require_gpu | bool

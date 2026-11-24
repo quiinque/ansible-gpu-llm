@@ -1,0 +1,51 @@
+---
+- name: Detect WSL environment
+  ansible.builtin.set_fact:
+    gpu_llm_running_in_wsl: "{{ 'microsoft' in (ansible_facts.kernel | lower) }}"
+
+- name: Validate configuration before changes
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version in ['22.04', '24.04']
+      - ansible_facts.architecture == 'x86_64'
+      - ansible_facts.service_mgr == 'systemd'
+      - gpu_llm_wsl_mode == gpu_llm_running_in_wsl
+      - gpu_llm_port | int > 1024
+      - gpu_llm_port | int < 65536
+      - gpu_llm_context_length | int > 0
+      - gpu_llm_generation_timeout | int > 0
+      - gpu_llm_pull_timeout | int > 0
+      - "':' in gpu_llm_model"
+      - gpu_llm_directory is match('^/[a-zA-Z0-9/_-]+$')
+      - gpu_llm_directory not in ['/', '/etc', '/usr', '/var', '/opt']
+      - gpu_llm_image is match('^ollama/ollama(:[0-9][a-zA-Z0-9._-]*|@sha256:[a-f0-9]{64})$')
+      - gpu_llm_wsl_mode or gpu_llm_driver_package is match('^nvidia-driver-[0-9]+(-server)?(-open)?(=.+)?$')
+    fail_msg: >-
+      Require Ubuntu 22.04/24.04 amd64 with systemd, matching WSL mode,
+      a pinned Ollama image, and an explicit native NVIDIA driver package.
+      See config.example.yml before deployment.
+
+- name: Check WSL GPU bridge
+  ansible.builtin.stat:
+    path: /dev/dxg
+  register: gpu_llm_wsl_bridge
+  when: gpu_llm_wsl_mode
+
+- name: Require WSL GPU access
+  ansible.builtin.assert:
+    that: gpu_llm_wsl_bridge.stat.exists
+  when: gpu_llm_wsl_mode
+
+- name: Verify WSL driver provided by Windows
+  ansible.builtin.command: /usr/lib/wsl/lib/nvidia-smi
+  changed_when: false
+  check_mode: false
+  when: gpu_llm_wsl_mode
+
+- name: Install common prerequisites
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, pciutils, python3-apt]
+    state: present
+    update_cache: true
+    cache_valid_time: '{{ gpu_llm_apt_cache_valid_time }}'

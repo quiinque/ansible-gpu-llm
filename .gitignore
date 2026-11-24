@@ -19,3 +19,5 @@ secrets.yml
 vault-password*
 .DS_Store
 Thumbs.db
+config.local.yml
+.ansible-lint-cache/

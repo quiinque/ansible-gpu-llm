@@ -1,7 +1,9 @@
 ---
-- name: Verify deployed Ollama without changing infrastructure
+- name: Verify deployed inference API
   hosts: gpu_servers
   gather_facts: false
   tasks:
-    - name: Run inference checks
-      ansible.builtin.include_tasks: tasks/verify.yml
+    - name: Verify model response and GPU allocation
+      ansible.builtin.import_role:
+        name: gpu_llm
+        tasks_from: verify
