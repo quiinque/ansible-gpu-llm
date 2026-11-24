@@ -21,9 +21,9 @@
 - name: Require a completed nonempty response
   ansible.builtin.assert:
     that:
-      - gpu_llm_generation.json.done | bool
-      - gpu_llm_generation.json.response | trim | length > 0
-      - gpu_llm_generation.json.eval_count | int > 0
+      - gpu_llm_generation.json.done | default(false) | bool
+      - gpu_llm_generation.json.response | default('') | trim | length > 0
+      - gpu_llm_generation.json.eval_count | default(0) | int > 0
 
 - name: Inspect loaded model GPU allocation
   ansible.builtin.uri:
@@ -35,7 +35,8 @@
   ansible.builtin.assert:
     that:
       - >-
-        gpu_llm_loaded_models.json.models | selectattr('name', 'equalto', gpu_llm_model)
+        gpu_llm_loaded_models.json.models
+        | selectattr('name', 'match', '^' ~ (gpu_llm_model | regex_escape) ~ '(:|$)')
         | map(attribute='size_vram') | map('int') | sum > 0
     fail_msg: Model did not allocate VRAM. Check driver, GPU compatibility, memory and Ollama logs.
   when: gpu_llm_require_gpu | bool
