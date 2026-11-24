@@ -4,6 +4,8 @@
 
 Роль `gpu_llm` использует defaults, handlers, шаблон Compose, проверку аргументов и отдельные этапы. Основной сценарий — сервер по SSH; WSL2 — дополнительный тестовый стенд. См. [WSL-TEST.md](WSL-TEST.md) и [VALIDATION.md](VALIDATION.md).
 
+CI и новая роль прошли проверку: deployment, повторный запуск с changed=0, API/VRAM после перезапуска WSL. Серверная установка драйвера и native reboot остаются непроверенными. Подробности и ссылка на CI — в [VALIDATION.md](VALIDATION.md).
+
 ## Быстрый старт на Ubuntu Server
 
 На Linux controller с Python 3.12:
@@ -90,7 +92,7 @@ Docker включён в systemd; контейнер использует restar
 
 ## Ресурсы и проверка
 
-Для Qwen3.6-27B с 8 ГБ VRAM используется частичный offload в RAM/CPU. Исходная версия проверена на RTX 3070, 32 ГБ RAM хоста и WSL с лимитом 24 ГБ RAM / 8 ГБ swap, контекст 2048. В одном запросе получено около 4,1 токена/с; это не SLA. Нужен свободный диск для Docker и весов, исходящий HTTPS к Ubuntu mirrors, Docker, NVIDIA и Ollama registry/storage.
+Для Qwen3.6-27B с 8 ГБ VRAM используется частичный offload в RAM/CPU. Новая роль проверена на RTX 3070, 32 ГБ RAM хоста и WSL с лимитом 24 ГБ RAM / 8 ГБ swap, контекст 2048. В одном запросе получено около 4,1 токена/с; это не SLA. Нужен свободный диск для Docker и весов, исходящий HTTPS к Ubuntu mirrors, Docker, NVIDIA и Ollama registry/storage.
 
 ```bash
 yamllint .
