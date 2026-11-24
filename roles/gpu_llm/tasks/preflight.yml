@@ -45,7 +45,12 @@
 
 - name: Install common prerequisites
   ansible.builtin.apt:
-    name: [ca-certificates, curl, pciutils, python3-apt]
+    name:
+      - ca-certificates
+      - curl
+      - pciutils
+      - python3-apt
+      - python3-debian
     state: present
     update_cache: true
-    cache_valid_time: '{{ gpu_llm_apt_cache_valid_time }}'
+    cache_valid_time: "{{ gpu_llm_apt_cache_valid_time }}"
