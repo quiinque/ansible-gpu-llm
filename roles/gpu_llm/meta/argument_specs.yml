@@ -7,27 +7,59 @@ argument_specs:
         type: str
         required: true
         description: Tested ollama/ollama version tag or SHA256 image digest.
+
       gpu_llm_model:
         type: str
         description: Ollama model with explicit tag.
+
       gpu_llm_wsl_mode:
         type: bool
         description: Use Windows driver in WSL2 and skip native driver installation.
+
       gpu_llm_allow_reboot:
         type: bool
         description: Allow a required native server reboot during maintenance.
+
       gpu_llm_driver_package:
         type: str
         description: NVIDIA driver package selected for the target hardware.
+
       gpu_llm_require_gpu:
         type: bool
         description: Require positive VRAM allocation after inference.
+
       gpu_llm_refresh_model:
         type: bool
         description: Explicitly refresh existing model weights.
+
       gpu_llm_port:
         type: int
         description: Loopback TCP port for the API.
+
       gpu_llm_context_length:
         type: int
         description: Maximum default context length.
+      gpu_llm_directory:
+        type: str
+        description: Directory for inference service deployment.
+
+      gpu_llm_keep_alive:
+        type: str
+        description: Duration to keep the model loaded.
+
+      gpu_llm_pull_timeout:
+        type: int
+        description: Model pull timeout in seconds.
+
+      gpu_llm_generation_timeout:
+        type: int
+        description: Inference timeout in seconds.
+
+      gpu_llm_apt_cache_valid_time:
+        type: int
+        description: APT cache validity in seconds.
+
+      gpu_llm_container_packages_to_install:
+        type: list
+        elements: str
+        description: Container engine and GPU toolkit packages.
