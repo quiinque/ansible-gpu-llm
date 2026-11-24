@@ -5,9 +5,6 @@
   gather_facts: false
   vars_files:
     - ../roles/gpu_llm/defaults/main.yml
-  vars:
-    # Syntax fixture only; never pulled or deployed.
-    gpu_llm_image: ollama/ollama:0.0.0
   tasks:
     - name: Create temporary render directory
       ansible.builtin.tempfile:
@@ -17,6 +14,9 @@
     - name: Render and validate Compose specification
       block:
         - name: Render role template
+          vars:
+            # Task vars override vars_files; never pulled or deployed.
+            gpu_llm_image: ollama/ollama:0.0.0
           ansible.builtin.template:
             src: ../roles/gpu_llm/templates/compose.yml.j2
             dest: '{{ compose_test_directory.path }}/compose.yml'
